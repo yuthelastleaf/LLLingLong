@@ -39,6 +39,9 @@ Bubble::~Bubble() {
 }
 
 void Bubble::show(const std::string& message, int parentX, int parentY, int parentW, int parentH) {
+    std::cout << "[ChatBubble] show() called with message: \"" << message << "\"" << std::endl;
+    std::cout << "[ChatBubble] Parent position: (" << parentX << ", " << parentY << "), size: (" << parentW << ", " << parentH << ")" << std::endl;
+    
     currentMessage_ = message;
     visible_ = true;
     displayTime_ = 0.0f;
@@ -50,7 +53,12 @@ void Bubble::show(const std::string& message, int parentX, int parentY, int pare
     lastParentH_ = parentH;
     
 #ifdef _WIN32
-    if (!bubbleWindow_) return;
+    if (!bubbleWindow_) {
+        std::cout << "[ChatBubble] ERROR: bubbleWindow_ is NULL!" << std::endl;
+        return;
+    }
+    
+    std::cout << "[ChatBubble] bubbleWindow_ = " << bubbleWindow_ << std::endl;
     
     // Convert UTF-8 to UTF-16
     int wideSize = MultiByteToWideChar(CP_UTF8, 0, message.c_str(), -1, nullptr, 0);
@@ -93,11 +101,26 @@ void Bubble::show(const std::string& message, int parentX, int parentY, int pare
         bubbleX = screenRect.right - bubbleWidth;
     
     // Update window
-    SetWindowPos(bubbleWindow_, HWND_TOPMOST, bubbleX, bubbleY, bubbleWidth, bubbleHeight, 
+    std::cout << "[ChatBubble] Setting window position: (" << bubbleX << ", " << bubbleY << "), size: (" << bubbleWidth << ", " << bubbleHeight << ")" << std::endl;
+    
+    BOOL result = SetWindowPos(bubbleWindow_, HWND_TOPMOST, bubbleX, bubbleY, bubbleWidth, bubbleHeight, 
         SWP_SHOWWINDOW);
+    
+    if (!result) {
+        std::cout << "[ChatBubble] SetWindowPos failed, error: " << GetLastError() << std::endl;
+    } else {
+        std::cout << "[ChatBubble] SetWindowPos succeeded" << std::endl;
+    }
+    
+    // Force window to be visible
+    ShowWindow(bubbleWindow_, SW_SHOW);
+    UpdateWindow(bubbleWindow_);
+    SetForegroundWindow(bubbleWindow_);
+    std::cout << "[ChatBubble] ShowWindow/UpdateWindow/SetForegroundWindow called" << std::endl;
     
     updateBubbleText(message);
     InvalidateRect(bubbleWindow_, nullptr, TRUE);
+    std::cout << "[ChatBubble] show() completed" << std::endl;
 #endif
 }
 
@@ -160,6 +183,8 @@ void Bubble::render() {
 
 #ifdef _WIN32
 void Bubble::createBubbleWindow() {
+    std::cout << "[ChatBubble] Creating bubble window..." << std::endl;
+    
     // Register window class
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -170,7 +195,13 @@ void Bubble::createBubbleWindow() {
     wc.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
     wc.lpszClassName = L"ChatBubbleClass";
     
-    RegisterClassExW(&wc);
+    if (!RegisterClassExW(&wc)) {
+        DWORD error = GetLastError();
+        if (error != ERROR_CLASS_ALREADY_EXISTS) {
+            std::cout << "[ChatBubble] Failed to register window class, error: " << error << std::endl;
+            return;
+        }
+    }
     
     // Create window
     bubbleWindow_ = CreateWindowExW(
@@ -183,8 +214,11 @@ void Bubble::createBubbleWindow() {
     );
     
     if (bubbleWindow_) {
+        std::cout << "[ChatBubble] Window created successfully: " << bubbleWindow_ << std::endl;
         // Make window 90% opaque
         SetLayeredWindowAttributes(bubbleWindow_, 0, 230, LWA_ALPHA);
+    } else {
+        std::cout << "[ChatBubble] Failed to create window, error: " << GetLastError() << std::endl;
     }
 }
 
